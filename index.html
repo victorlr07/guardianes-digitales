@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Guardianes Digitales — Prototipo Web</title>
+  <style>
+    html,body { height:100%; margin:0; font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:#0b1220; color:#fff; }
+    #game-container { width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+    .ui-panel{ position:absolute; top:12px; left:12px; background:rgba(255,255,255,0.06); padding:10px 12px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.6); }
+    .ui-panel h1{ margin:0 0 6px 0; font-size:16px; }
+    .ui-panel p{ margin:0; font-size:13px; opacity:0.9 }
+    .btn { display:inline-block; background:linear-gradient(180deg,#2dd4bf,#06b6d4); color:#022; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600; margin-top:8px; }
+    .credits{ position:absolute; right:12px; bottom:12px; font-size:12px; opacity:0.8 }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+  <div class="ui-panel" id="infoPanel">
+    <h1>Guardianes Digitales</h1>
+    <p>Prototipo web: ética y responsabilidad digital — 8 salas.</p>
+    <div id="profileSummary" style="margin-top:8px;font-size:13px">Perfil: <strong id="profileLabel">Sin jugar</strong></div>
+    <div class="btn" id="startBtn">Comenzar</div>
+  </div>
+  <div class="credits">Prototipo — pide cambios para adaptar contenido</div>
+
+  <!-- Phaser 3 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script>
+  /*
+    Guardianes Digitales - Prototipo simple (HTML + Phaser3)
+    - Juego en 2D con salas (7 salas + final)
+    - Cada sala plantea una pregunta/mini-desafío sobre ética digital
+    - Al completar se asignan puntos a ejes: Respeto, Privacidad, Veracidad, Seguridad
+    - Al final se muestra un perfil simple
+
+    Para extender:
+    - Añadir más preguntas, assets, niveles
+    - Guardar progreso en servidor / localStorage
+    - Mejorar UI, audio y adaptabilidad
+  */
+
+  // Configuración del juego
+  const config = {
+    type: Phaser.AUTO,
+    parent: 'game-container',
+    width: Math.min(window.innerWidth, 1000),
+    height: Math.min(window.innerHeight, 700),
+    backgroundColor: '#0b1220',
+    scene: [BootScene, MenuScene, MapScene, RoomScene, FinalScene],
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
+  };
+
+  // Guardamos el estado global del jugador
+  const GAME_STATE = {
+    scores: { Respeto:0, Privacidad:0, Veracidad:0, Seguridad:0 },
+    currentRoomIndex: 0,
+    roomsCompleted: []
+  };
+
+  // ---- SCENES ----
+  function BootScene () { Phaser.Scene.call(this, { key:'BootScene' }); }
+  BootScene.prototype = Object.create(Phaser.Scene.prototype);
+  BootScene.prototype.constructor = BootScene;
+  BootScene.prototype.preload = function(){
+    // Aquí se podrían cargar assets (imágenes, sprites) si existieran
+  }
+  BootScene.prototype.create = function(){
+    this.scene.start('MenuScene');
+  }
+
+  function MenuScene () { Phaser.Scene.call(this, { key:'MenuScene' }); }
+  MenuScene.prototype = Object.create(Phaser.Scene.prototype);
+  MenuScene.prototype.constructor = MenuScene;
+  MenuScene.prototype.create = function(){
+    const w = this.sys.game.config.width, h = this.sys.game.config.height;
+    this.add.text(w/2, h/2 - 120, 'Guardianes Digitales', { fontSize: '36px', color:'#ffffff' }).setOrigin(0.5);
+    this.add.text(w/2, h/2 - 70, 'Un juego sobre ética y responsabilidad digital', { fontSize: '16px', color:'#cbd5e1' }).setOrigin(0.5);
+
+    const start = this.add.rectangle(w/2, h/2 + 10, 260, 56, 0x06b6d4).setInteractive({useHandCursor:true});
+    const startTxt = this.add.text(w/2, h/2 + 10, 'Comenzar misión', { fontSize:'18px', color:'#022' }).setOrigin(0.5);
+    start.on('pointerdown', ()=>{
+      this.scene.start('MapScene');
+    })
+  }
+
+  function MapScene () { Phaser.Scene.call(this, { key:'MapScene' }); }
+  MapScene.prototype = Object.create(Phaser.Scene.prototype);
+  MapScene.prototype.constructor = MapScene;
+  MapScene.prototype.create = function(){
+    const w = this.sys.game.config.width, h = this.sys.game.config.height;
+    this.add.text(20,20,'Mapa del ciberespacio — elige una sala', { fontSize:'18px' });
+
+    // Representamos 7 salas como círculos interactivos
+    const rooms = [
+      {name:'Desinformación', x:150, y:120, key:'room1'},
+      {name:'Privacidad', x:420, y:120, key:'room2'},
+      {name:'Respeto', x:690, y:120, key:'room3'},
+      {name:'Identidad', x:150, y:350, key:'room4'},
+      {name:'Datos', x:420, y:350, key:'room5'},
+      {name:'Colaboración', x:690, y:350, key:'room6'},
+      {name:'Riesgos', x:420, y:540, key:'room7'}
+    ];
+
+    rooms.forEach((r, idx)=>{
+      const c = this.add.circle(r.x, r.y, 58, 0x1f2937).setStrokeStyle(3, 0x06b6d4).setInteractive({useHandCursor:true});
+      const t = this.add.text(r.x, r.y, r.name, { fontSize:'14px', align:'center', wordWrap:{width:100}}).setOrigin(0.5);
+      c.on('pointerdown', ()=>{
+        this.scene.start('RoomScene',{roomIndex: idx});
+      })
+
+      // Mostrar check si ya completado
+      if (GAME_STATE.roomsCompleted.includes(idx)){
+        this.add.text(r.x+38, r.y-48, '✓', { fontSize:'28px', color:'#34d399' }).setOrigin(0.5);
+      }
+    });
+
+    // Botón para ver perfil
+    const perfilBtn = this.add.rectangle(w-140, 40, 220, 44, 0x111827).setStrokeStyle(2,0x06b6d4).setInteractive({useHandCursor:true});
+    const perfilTxt = this.add.text(w-140, 40, 'Ver perfil ético', { fontSize:'14px' }).setOrigin(0.5);
+    perfilBtn.on('pointerdown', ()=> this.scene.start('FinalScene'));
+  }
+
+  function RoomScene () { Phaser.Scene.call(this, { key:'RoomScene' }); }
+  RoomScene.prototype = Object.create(Phaser.Scene.prototype);
+  RoomScene.prototype.constructor = RoomScene;
+  RoomScene.prototype.init = function(data){ this.roomIndex = data.roomIndex || 0; }
+  RoomScene.prototype.create = function(){
+    const w = this.sys.game.config.width, h = this.sys.game.config.height;
+    this.add.text(20,20, `Sala: ${this.roomTitle(this.roomIndex)}`, { fontSize:'18px' });
+
+    // Preguntas / desafíos por sala (simple JSON)
+    const challenges = [
+      { q: 'Detecta la noticia verdadera: ¿Cuál parece más fiable?', options:['Titular sensacionalista sin fuente','Artículo con referencias y cita oficial'], score:[0,2] },
+      { q: 'Qué dato NO deberías compartir públicamente?', options:['Tu nombre de usuario','Tu dirección exacta'], score:[0,2] },
+      { q: 'Cómo responderías ante un comentario insultante?', options:['Ignorar o bloquear y apoyar a la víctima','Responder con otro insulto'], score:[2,0] },
+      { q: 'Qué muestra mejor tu identidad digital?', options:['Publicar solo fotos sin contexto','Compartir logros y opiniones respetuosas'], score:[0,2] },
+      { q: 'Qué permiso es más sensible en una app?', options:['Acceso a la cámara','Acceso a datos maquillados de uso'], score:[2,1] },
+      { q: 'Cómo colaborarías en un proyecto online?', options:['Escuchando y organizando tareas','Tomando decisiones sin consultar'], score:[2,0] },
+      { q: 'Qué mensaje te hace sospechar de una estafa?', options:['Presiona ya para ganar premio','Solicitud de datos bancarios urgente'], score:[0,2] }
+    ];
+
+    const ch = challenges[this.roomIndex];
+    this.add.text(w/2, 120, ch.q, { fontSize:'20px', wordWrap:{width: w-120} }).setOrigin(0.5);
+
+    // Opciones
+    ch.options.forEach((opt, i)=>{
+      const y = 220 + i*86;
+      const rect = this.add.rectangle(w/2, y, w-160, 70, 0x111827).setStrokeStyle(2,0x06b6d4).setInteractive({useHandCursor:true});
+      const txt = this.add.text(w/2, y, opt, { fontSize:'16px', color:'#fff', align:'center', wordWrap:{width:w-200} }).setOrigin(0.5);
+      rect.on('pointerdown', ()=>{
+        this.handleAnswer(i, ch.score[i]);
+      });
+    });
+
+    // Botón atrás
+    const back = this.add.text(20, h-40, '< Volver al mapa', { fontSize:'16px' }).setInteractive({useHandCursor:true});
+    back.on('pointerdown', ()=> this.scene.start('MapScene'));
+  }
+  RoomScene.prototype.roomTitle = function(idx){
+    const titles = ['Desinformación','Privacidad','Respeto','Identidad','Datos','Colaboración','Riesgos'];
+    return titles[idx] || 'Sala';
+  }
+  RoomScene.prototype.handleAnswer = function(optionIndex, scoreValue){
+    // Asignar puntos a eje según sala
+    const mapping = [ 'Veracidad','Privacidad','Respeto','Identidad','Privacidad','Colaboración','Seguridad' ];
+    const axis = mapping[this.roomIndex];
+
+    // Normalizamos a nuestras keys
+    if (axis === 'Veracidad') GAME_STATE.scores.Veracidad += scoreValue;
+    if (axis === 'Privacidad') GAME_STATE.scores.Privacidad += scoreValue;
+    if (axis === 'Respeto') GAME_STATE.scores.Respeto += scoreValue;
+    if (axis === 'Seguridad') GAME_STATE.scores.Seguridad += scoreValue;
+    if (axis === 'Identidad') GAME_STATE.scores.Respeto += scoreValue; // identidad ayuda al respeto
+    if (axis === 'Colaboración') GAME_STATE.scores.Respeto += scoreValue;
+
+    // Marcar completado
+    if (!GAME_STATE.roomsCompleted.includes(this.roomIndex)) GAME_STATE.roomsCompleted.push(this.roomIndex);
+
+    // Mensaje rápido
+    const scene = this;
+    const pop = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height - 80, 'Respuesta guardada — vuelve al mapa', { fontSize:'16px' }).setOrigin(0.5);
+    this.time.delayedCall(1200, ()=>{ pop.destroy(); scene.scene.start('MapScene'); });
+  }
+
+  function FinalScene () { Phaser.Scene.call(this, { key:'FinalScene' }); }
+  FinalScene.prototype = Object.create(Phaser.Scene.prototype);
+  FinalScene.prototype.constructor = FinalScene;
+  FinalScene.prototype.create = function(){
+    const w = this.sys.game.config.width, h = this.sys.game.config.height;
+    this.add.text(w/2, 80, 'Perfil Ético Digital', { fontSize:'28px' }).setOrigin(0.5);
+
+    // Mostrar resultados
+    const s = GAME_STATE.scores;
+    const lines = [
+      `Respeto: ${s.Respeto}`,
+      `Privacidad: ${s.Privacidad}`,
+      `Veracidad: ${s.Veracidad}`,
+      `Seguridad: ${s.Seguridad}`
+    ];
+
+    lines.forEach((l, i)=> this.add.text(w/2, 160 + i*46, l, { fontSize:'20px' }).setOrigin(0.5));
+
+    // Perfil simple
+    const total = s.Respeto + s.Privacidad + s.Veracidad + s.Seguridad;
+    let profile = 'Caminante en formación';
+    if (total >= 6) profile = 'Navegante Consciente';
+    if (total >= 10) profile = 'Guardián Ético';
+
+    this.add.text(w/2, h-140, `Tu perfil: ${profile}`, { fontSize:'22px', fontStyle:'bold' }).setOrigin(0.5);
+
+    const restart = this.add.rectangle(w/2, h-60, 280, 56, 0x06b6d4).setInteractive({useHandCursor:true});
+    const restartTxt = this.add.text(w/2, h-60, 'Reiniciar partida', { fontSize:'18px', color:'#022' }).setOrigin(0.5);
+    restart.on('pointerdown', ()=>{
+      // reset
+      GAME_STATE.scores = { Respeto:0, Privacidad:0, Veracidad:0, Seguridad:0 };
+      GAME_STATE.roomsCompleted = [];
+      this.scene.start('MapScene');
+    })
+  }
+
+  // ---- Lanzar el juego ----
+  const game = new Phaser.Game(config);
+
+  // Manejo del UI externo (botón start del panel HTML)
+  document.getElementById('startBtn').addEventListener('click', ()=>{
+    // Iniciar el juego desde la escena menu
+    game.scene.start('MenuScene');
+    document.getElementById('infoPanel').style.display = 'none';
+  });
+
+  // Mostrar resumen de perfil en el panel (dinámico)
+  function updateProfileLabel(){
+    const s = GAME_STATE.scores;
+    const total = s.Respeto + s.Privacidad + s.Veracidad + s.Seguridad;
+    let label = 'Sin jugar';
+    if (total > 0 && total < 6) label = 'En progreso';
+    if (total >= 6) label = 'Avanzado';
+    document.getElementById('profileLabel').innerText = label;
+  }
+  setInterval(updateProfileLabel, 800);
+
+  </script>
+</body>
+</html>
